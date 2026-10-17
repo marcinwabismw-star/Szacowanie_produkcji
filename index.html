@@ -6,6 +6,7 @@
 <title>Final Inspection</title>
 <style>
   :root {
+    color-scheme: light dark;
     --bg: #eef0f2;
     --card: #ffffff;
     --ink: #14181c;
@@ -16,6 +17,7 @@
     --warn-bg: #fff3d6;
     --warn-ink: #6b4700;
     --err: #b3261e;
+    --ok: #1b6e3a;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -29,6 +31,7 @@
       --warn-bg: #3a2f12;
       --warn-ink: #ffd98a;
       --err: #ff8a80;
+      --ok: #7fd49a;
     }
   }
   * { box-sizing: border-box; }
@@ -79,7 +82,19 @@
     background: var(--bg);
     color: var(--ink);
   }
-  input:focus, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+  input:focus, button:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+  /* Własna ikona zegara: kolor nie zależy od ustawień przeglądarki */
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2314181c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E") center / 24px 24px no-repeat;
+    opacity: 1;
+    cursor: pointer;
+    padding: 6px;
+  }
+  @media (prefers-color-scheme: dark) {
+    input[type="time"]::-webkit-calendar-picker-indicator {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23f1f4f6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");
+    }
+  }
   .row { margin-bottom: 14px; }
   .time-line { display: flex; gap: 8px; }
   .time-line input { flex: 1; min-width: 0; }
@@ -150,8 +165,10 @@
   }
   .entry .big { font-weight: 600; }
   .entry .muted { color: var(--muted); font-size: .75rem; }
+  .entry .unreliable { color: var(--err); font-weight: 700; font-size: .8rem; }
   .empty { color: var(--muted); text-align: center; padding: 24px 8px; }
   .clear { width: 100%; padding: 12px; background: transparent; color: var(--err); border-color: var(--err); margin-top: 6px; }
+
 </style>
 </head>
 <body>
@@ -207,6 +224,7 @@
   <div id="panelHist" role="tabpanel" aria-labelledby="tabHist" hidden>
     <div id="historiaLista"></div>
     <button class="clear" id="czyscHistorie" type="button">Wyczyść historię</button>
+
   </div>
 </main>
 
@@ -327,7 +345,7 @@
     elZapisz.disabled = false;
   }
 
-  /* ---------- Historia: zapis ---------- */
+  /* ---------- Pamięć lokalna ---------- */
   function wczytaj() {
     try {
       var s = localStorage.getItem(KLUCZ);
@@ -335,11 +353,18 @@
       return Array.isArray(a) ? a : [];
     } catch (e) { return []; }
   }
-  function zapiszWszystko(lista) {
+  function zapiszLokalnie(lista) {
     try { localStorage.setItem(KLUCZ, JSON.stringify(lista)); return true; }
     catch (e) { return false; }
   }
+  function kluczWpisu(w) { return w.doba + '|' + w.zmiana + '|' + w.czas; }
 
+  // Stosuje zmianę do historii zapisanej w tej przeglądarce. Zwraca true, gdy zapis się udał.
+  function zmien(fnMod) {
+    return zapiszLokalnie(fnMod(wczytaj()));
+  }
+
+  /* ---------- Zapis wpisu ---------- */
   // Doba produkcyjna zaczyna się o 6:00. Odczyty III zmiany po północy należą do poprzedniej doby.
   function dobaProdukcyjna(t, nr) {
     var d = new Date();
@@ -351,28 +376,25 @@
 
   elZapisz.addEventListener('click', function () {
     if (!ostatni) return;
-    var lista = wczytaj();
-    var doba = dobaProdukcyjna(ostatni.t, ostatni.nr);
     var wpis = {
-      doba: doba, zmiana: ostatni.nr, czas: hhmm(ostatni.t), minut: ostatni.minut,
+      doba: dobaProdukcyjna(ostatni.t, ostatni.nr), zmiana: ostatni.nr, czas: hhmm(ostatni.t), minut: ostatni.minut,
       wartosc: ostatni.wartosc, naGodzine: ostatni.naGodzine, na8h: ostatni.na8h,
       operatorzy: ostatni.operatorzy, mala: ostatni.mala
     };
-    // Ten sam czas w tej samej zmianie i dobie nadpisuje poprzedni wpis
-    var zastapiono = false;
-    lista = lista.filter(function (w) {
-      var ten = w.doba === wpis.doba && w.zmiana === wpis.zmiana && w.czas === wpis.czas;
-      if (ten) zastapiono = true;
-      return !ten;
+    var istnialo = wczytaj().some(function (w) { return kluczWpisu(w) === kluczWpisu(wpis); });
+
+    var udalo = zmien(function (lista) {
+      return lista.filter(function (w) { return kluczWpisu(w) !== kluczWpisu(wpis); }).concat([wpis]);
     });
-    lista.push(wpis);
-    if (zapiszWszystko(lista)) {
-      elZapisMsg.textContent = (zastapiono ? 'Zaktualizowano wpis z ' : 'Zapisano o ') + wpis.czas + ' (' + wpis.zmiana + ' zmiana).';
+
+    elZapisMsg.textContent = udalo
+      ? (istnialo ? 'Zaktualizowano wpis z ' : 'Zapisano o ') + wpis.czas + ' (' + wpis.zmiana + ' zmiana).'
+      : 'Nie udało się zapisać. Przeglądarka blokuje pamięć lokalną.';
+
+    if (udalo) {
       elWartosc.value = '';
       przelicz();
       elWartosc.focus();
-    } else {
-      elZapisMsg.textContent = 'Nie udało się zapisać. Przeglądarka blokuje pamięć lokalną.';
     }
     renderHistorii();
   });
@@ -425,10 +447,10 @@
             usun.type = 'button';
             usun.setAttribute('aria-label', 'Usuń wpis z ' + w.czas);
             usun.addEventListener('click', function () {
-              var nowa = wczytaj().filter(function (x) {
-                return !(x.doba === w.doba && x.zmiana === w.zmiana && x.czas === w.czas);
+              usun.disabled = true;
+              zmien(function (l) {
+                return l.filter(function (x) { return kluczWpisu(x) !== kluczWpisu(w); });
               });
-              zapiszWszystko(nowa);
               renderHistorii();
             });
             gora.appendChild(usun);
@@ -437,7 +459,7 @@
             wpis.appendChild(el('div', 'big', fmt(w.operatorzy, 2) + ' oper.'));
             wpis.appendChild(el('div', 'muted', fmt(w.naGodzine, 0) + ' szt./h'));
             wpis.appendChild(el('div', 'muted', 'wpisano: ' + fmt(w.wartosc, 0)));
-            if (w.mala) wpis.appendChild(el('div', 'muted', 'mało wiarygodne'));
+            if (w.mala) wpis.appendChild(el('div', 'unreliable', 'mało wiarygodne'));
             kol.appendChild(wpis);
           });
 
@@ -459,7 +481,7 @@
   czyscBtn.addEventListener('click', function () {
     if (czyscBtn.dataset.potwierdz === '1') {
       resetCzyszczenia();
-      zapiszWszystko([]);
+      zmien(function () { return []; });
       renderHistorii();
     } else {
       czyscBtn.dataset.potwierdz = '1';

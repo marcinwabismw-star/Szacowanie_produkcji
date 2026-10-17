@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Final Inspection</title>
+<style>
+  :root {
+    --bg: #eef0f2;
+    --card: #ffffff;
+    --ink: #14181c;
+    --muted: #5b6670;
+    --line: #d3d9de;
+    --accent: #0b5cad;
+    --accent-soft: #e3eefa;
+    --warn-bg: #fff3d6;
+    --warn-ink: #6b4700;
+    --err: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161a;
+      --card: #1c2228;
+      --ink: #f1f4f6;
+      --muted: #97a3ad;
+      --line: #313a42;
+      --accent: #6db3f5;
+      --accent-soft: #1d3042;
+      --warn-bg: #3a2f12;
+      --warn-ink: #ffd98a;
+      --err: #ff8a80;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+    line-height: 1.4;
+    padding: 16px;
+    min-height: 100vh;
+  }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 4px 0 2px; font-weight: 700; }
+  .subtitle { margin: 0 0 16px; color: var(--muted); font-size: 1.05rem; }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .tab {
+    flex: 1;
+    padding: 12px;
+    font: inherit;
+    font-weight: 600;
+    border: 2px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .tab[aria-selected="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  [hidden] { display: none !important; }
+
+  .calc { max-width: 480px; margin: 0 auto; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  label { display: block; font-weight: 600; margin-bottom: 6px; }
+  input {
+    width: 100%;
+    font: inherit;
+    font-size: 1.4rem;
+    padding: 12px;
+    border: 2px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  input:focus, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+  .row { margin-bottom: 14px; }
+  .time-line { display: flex; gap: 8px; }
+  .time-line input { flex: 1; min-width: 0; }
+  button {
+    font: inherit;
+    font-weight: 600;
+    padding: 0 16px;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    cursor: pointer;
+  }
+  button[aria-pressed="true"] { background: var(--accent); color: var(--card); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .hint { font-size: .85rem; color: var(--muted); margin-top: 6px; }
+  .shift {
+    background: var(--accent-soft);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: .95rem;
+  }
+  .shift strong { color: var(--accent); }
+  .warn {
+    background: var(--warn-bg);
+    color: var(--warn-ink);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: .9rem;
+    margin-top: 10px;
+  }
+  .result { padding: 14px 16px; }
+  .result .name { color: var(--muted); font-size: .95rem; }
+  .result .value { font-size: 2.4rem; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  .result .unit { font-size: 1rem; font-weight: 400; color: var(--muted); }
+  .error { color: var(--err); font-weight: 600; min-height: 1.4em; margin-top: 6px; }
+  .save { width: 100%; padding: 14px; font-size: 1.1rem; background: var(--accent); color: var(--card); }
+  .save-msg { text-align: center; color: var(--muted); font-size: .9rem; min-height: 1.3em; margin-top: 8px; }
+
+  /* Historia */
+  .day { margin-bottom: 18px; }
+  .day h2 { font-size: 1.05rem; margin: 0 0 8px; text-transform: capitalize; }
+  .cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .col-head {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 8px;
+    padding: 8px 6px;
+    text-align: center;
+    font-weight: 700;
+    font-size: .9rem;
+  }
+  .col-head small { display: block; font-weight: 400; color: var(--muted); font-size: .75rem; }
+  .col { display: flex; flex-direction: column; gap: 6px; }
+  .entry {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px;
+    font-size: .85rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .entry .top { display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+  .entry .time { font-weight: 700; font-size: 1rem; }
+  .entry .del {
+    padding: 0; width: 26px; height: 26px; line-height: 1; border-width: 1px;
+    font-size: 1rem; background: transparent; color: var(--muted); border-color: var(--line);
+  }
+  .entry .big { font-weight: 600; }
+  .entry .muted { color: var(--muted); font-size: .75rem; }
+  .empty { color: var(--muted); text-align: center; padding: 24px 8px; }
+  .clear { width: 100%; padding: 12px; background: transparent; color: var(--err); border-color: var(--err); margin-top: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Final Inspection</h1>
+  <p class="subtitle">Szacowana produkcja</p>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" id="tabKalk" role="tab" aria-selected="true" aria-controls="panelKalk" type="button">Kalkulator</button>
+    <button class="tab" id="tabHist" role="tab" aria-selected="false" aria-controls="panelHist" type="button">Historia</button>
+  </div>
+
+  <!-- KALKULATOR -->
+  <div class="calc" id="panelKalk" role="tabpanel" aria-labelledby="tabKalk">
+    <section class="card">
+      <div class="row">
+        <label for="wartosc">Wyprodukowane opony (z raportu)</label>
+        <input id="wartosc" type="number" inputmode="numeric" min="0" step="1" placeholder="np. 3124" autofocus>
+      </div>
+      <div class="row">
+        <label for="czas">Godzina odczytu</label>
+        <div class="time-line">
+          <input id="czas" type="time" step="60">
+          <button id="teraz" type="button" aria-pressed="true">Teraz</button>
+        </div>
+        <div class="hint" id="podpowiedz"></div>
+      </div>
+      <div class="shift" id="zmiana" aria-live="polite"></div>
+      <div class="warn" id="ostrzezenie" hidden></div>
+      <div class="error" id="blad" role="alert"></div>
+    </section>
+
+    <section class="card result">
+      <div class="name">Szacowana produkcja na godzinę</div>
+      <div class="value"><span id="naGodzine">–</span> <span class="unit">szt.</span></div>
+    </section>
+
+    <section class="card result">
+      <div class="name">Szacowana produkcja na 8 godzin</div>
+      <div class="value"><span id="na8h">–</span> <span class="unit">szt.</span></div>
+    </section>
+
+    <section class="card result">
+      <div class="name">Szacowana ilość operatorów SKJ</div>
+      <div class="value"><span id="operatorzy">–</span></div>
+    </section>
+
+    <button class="save" id="zapisz" type="button" disabled>Zapisz do historii</button>
+    <div class="save-msg" id="zapisMsg" aria-live="polite"></div>
+  </div>
+
+  <!-- HISTORIA -->
+  <div id="panelHist" role="tabpanel" aria-labelledby="tabHist" hidden>
+    <div id="historiaLista"></div>
+    <button class="clear" id="czyscHistorie" type="button">Wyczyść historię</button>
+  </div>
+</main>
+
+<script>
+(function () {
+  var DZIELNIK_SKJ = 615;
+  var DLUGOSC_ZMIANY_MIN = 8 * 60;
+  var MIN_WIARYGODNY = 30; // minuty od początku zmiany
+  var KLUCZ = 'final_inspection_historia_v1';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var elWartosc = $('wartosc'), elCzas = $('czas'), elTeraz = $('teraz'),
+      elPodpowiedz = $('podpowiedz'), elZmiana = $('zmiana'), elOstrz = $('ostrzezenie'),
+      elBlad = $('blad'), elNaGodzine = $('naGodzine'), elNa8h = $('na8h'),
+      elOperatorzy = $('operatorzy'), elZapisz = $('zapisz'), elZapisMsg = $('zapisMsg');
+
+  var NAZWY = { 1: 'I zmiana (6–14)', 2: 'II zmiana (14–22)', 3: 'III zmiana (22–6)' };
+  var GODZINY = { 1: '6–14', 2: '14–22', 3: '22–6' };
+  var trybAuto = true;
+  var ostatni = null; // ostatni poprawny wynik, który można zapisać
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function fmt(n, miejsca) {
+    return n.toLocaleString('pl-PL', { minimumFractionDigits: miejsca, maximumFractionDigits: miejsca });
+  }
+  function teraz() { var d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
+  function hhmm(t) { return pad(Math.floor(t / 60)) + ':' + pad(t % 60); }
+  function klucz(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+
+  // t = minuty od północy (0–1439). Zwraca zmianę i ile minut minęło od jej startu.
+  // Dokładnie o 6:00 / 14:00 / 22:00 to koniec poprzedniej zmiany (480 min).
+  function ustalZmiane(t) {
+    var nr, start;
+    if (t >= 360 && t < 840) { nr = 1; start = 360; }
+    else if (t >= 840 && t < 1320) { nr = 2; start = 840; }
+    else { nr = 3; start = 1320; }
+    var minut = ((t - start) + 1440) % 1440;
+    if (minut === 0) {
+      minut = DLUGOSC_ZMIANY_MIN;
+      nr = nr === 1 ? 3 : nr - 1;
+    }
+    return { nr: nr, minut: minut };
+  }
+
+  function pobierzMinuty() {
+    if (trybAuto) return teraz();
+    var m = /^(\d{1,2}):(\d{2})/.exec(elCzas.value);
+    if (!m) return null;
+    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  }
+
+  function ustawTryb(auto) {
+    trybAuto = auto;
+    elTeraz.setAttribute('aria-pressed', auto ? 'true' : 'false');
+    elPodpowiedz.textContent = auto
+      ? 'Czas pobierany na bieżąco. Zmień godzinę, żeby wpisać ją ręcznie.'
+      : 'Godzina wpisana ręcznie. Naciśnij „Teraz”, żeby wrócić do bieżącego czasu.';
+  }
+
+  function odswiezPoleCzasu() {
+    if (trybAuto) elCzas.value = hhmm(teraz());
+  }
+
+  function wyczysc() {
+    elNaGodzine.textContent = elNa8h.textContent = elOperatorzy.textContent = '–';
+    ostatni = null;
+    elZapisz.disabled = true;
+  }
+
+  function przelicz() {
+    odswiezPoleCzasu();
+    elBlad.textContent = '';
+    elOstrz.hidden = true;
+
+    var t = pobierzMinuty();
+    if (t === null) {
+      elZmiana.textContent = 'Wpisz godzinę odczytu.';
+      wyczysc();
+      return;
+    }
+    var z = ustalZmiane(t);
+    var godz = z.minut / 60;
+    var h = Math.floor(z.minut / 60), m = z.minut % 60;
+
+    elZmiana.innerHTML =
+      'Godzina <strong>' + hhmm(t) + '</strong>, ' +
+      '<strong>' + NAZWY[z.nr] + '</strong>. ' +
+      'Od startu zmiany minęło <strong>' + h + ' h ' + pad(m) + ' min</strong> (' + fmt(godz, 2) + ' h).';
+
+    var malaProbka = z.minut < MIN_WIARYGODNY;
+    if (malaProbka) {
+      elOstrz.textContent = 'Zmiana trwa dopiero ' + z.minut + ' min. Przy tak krótkim czasie szacunek jest bardzo niedokładny.';
+      elOstrz.hidden = false;
+    }
+
+    var raw = elWartosc.value.trim().replace(',', '.');
+    if (raw === '') { wyczysc(); return; }
+    var wartosc = Number(raw);
+    if (!isFinite(wartosc) || wartosc < 0) {
+      elBlad.textContent = 'Wpisz poprawną liczbę (0 lub więcej).';
+      wyczysc();
+      return;
+    }
+
+    var naGodzine = wartosc / godz;
+    var na8h = naGodzine * 8;
+    var operatorzy = Math.round((na8h / DZIELNIK_SKJ) * 100) / 100;
+
+    elNaGodzine.textContent = fmt(Math.round(naGodzine), 0);
+    elNa8h.textContent = fmt(Math.round(na8h), 0);
+    elOperatorzy.textContent = fmt(operatorzy, 2);
+
+    ostatni = {
+      t: t, nr: z.nr, minut: z.minut, wartosc: wartosc,
+      naGodzine: Math.round(naGodzine), na8h: Math.round(na8h),
+      operatorzy: operatorzy, mala: malaProbka
+    };
+    elZapisz.disabled = false;
+  }
+
+  /* ---------- Historia: zapis ---------- */
+  function wczytaj() {
+    try {
+      var s = localStorage.getItem(KLUCZ);
+      var a = s ? JSON.parse(s) : [];
+      return Array.isArray(a) ? a : [];
+    } catch (e) { return []; }
+  }
+  function zapiszWszystko(lista) {
+    try { localStorage.setItem(KLUCZ, JSON.stringify(lista)); return true; }
+    catch (e) { return false; }
+  }
+
+  // Doba produkcyjna zaczyna się o 6:00. Odczyty III zmiany po północy należą do poprzedniej doby.
+  function dobaProdukcyjna(t, nr) {
+    var d = new Date();
+    // Godzina wpisana ręcznie, późniejsza niż teraz, oznacza wczorajszy odczyt.
+    if (!trybAuto && t > teraz()) d.setDate(d.getDate() - 1);
+    if (nr === 3 && t < 1320) d.setDate(d.getDate() - 1);
+    return klucz(d);
+  }
+
+  elZapisz.addEventListener('click', function () {
+    if (!ostatni) return;
+    var lista = wczytaj();
+    var doba = dobaProdukcyjna(ostatni.t, ostatni.nr);
+    var wpis = {
+      doba: doba, zmiana: ostatni.nr, czas: hhmm(ostatni.t), minut: ostatni.minut,
+      wartosc: ostatni.wartosc, naGodzine: ostatni.naGodzine, na8h: ostatni.na8h,
+      operatorzy: ostatni.operatorzy, mala: ostatni.mala
+    };
+    // Ten sam czas w tej samej zmianie i dobie nadpisuje poprzedni wpis
+    var zastapiono = false;
+    lista = lista.filter(function (w) {
+      var ten = w.doba === wpis.doba && w.zmiana === wpis.zmiana && w.czas === wpis.czas;
+      if (ten) zastapiono = true;
+      return !ten;
+    });
+    lista.push(wpis);
+    if (zapiszWszystko(lista)) {
+      elZapisMsg.textContent = (zastapiono ? 'Zaktualizowano wpis z ' : 'Zapisano o ') + wpis.czas + ' (' + wpis.zmiana + ' zmiana).';
+      elWartosc.value = '';
+      przelicz();
+      elWartosc.focus();
+    } else {
+      elZapisMsg.textContent = 'Nie udało się zapisać. Przeglądarka blokuje pamięć lokalną.';
+    }
+    renderHistorii();
+  });
+
+  /* ---------- Historia: widok ---------- */
+  function el(tag, klasa, tekst) {
+    var e = document.createElement(tag);
+    if (klasa) e.className = klasa;
+    if (tekst !== undefined) e.textContent = tekst;
+    return e;
+  }
+
+  function nazwaDoby(k) {
+    var p = k.split('-');
+    var d = new Date(+p[0], +p[1] - 1, +p[2]);
+    return d.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric' });
+  }
+
+  function renderHistorii() {
+    var lista = wczytaj();
+    var kont = $('historiaLista');
+    kont.innerHTML = '';
+    $('czyscHistorie').hidden = lista.length === 0;
+
+    if (lista.length === 0) {
+      kont.appendChild(el('div', 'empty', 'Brak zapisanych pomiarów. Wpisz wartość w kalkulatorze i naciśnij „Zapisz do historii”.'));
+      return;
+    }
+
+    var doby = {};
+    lista.forEach(function (w) { (doby[w.doba] = doby[w.doba] || []).push(w); });
+    Object.keys(doby).sort().forEach(function (k) {
+      var blok = el('section', 'day');
+      blok.appendChild(el('h2', '', nazwaDoby(k)));
+      var siatka = el('div', 'cols');
+
+      [1, 2, 3].forEach(function (nr) {
+        var kol = el('div', 'col');
+        var glowa = el('div', 'col-head', nr + ' zmiana');
+        glowa.appendChild(el('small', '', GODZINY[nr]));
+        kol.appendChild(glowa);
+
+        doby[k].filter(function (w) { return w.zmiana === nr; })
+          .sort(function (a, b) { return b.minut - a.minut; })
+          .forEach(function (w) {
+            var wpis = el('div', 'entry');
+            var gora = el('div', 'top');
+            gora.appendChild(el('span', 'time', w.czas));
+            var usun = el('button', 'del', '×');
+            usun.type = 'button';
+            usun.setAttribute('aria-label', 'Usuń wpis z ' + w.czas);
+            usun.addEventListener('click', function () {
+              var nowa = wczytaj().filter(function (x) {
+                return !(x.doba === w.doba && x.zmiana === w.zmiana && x.czas === w.czas);
+              });
+              zapiszWszystko(nowa);
+              renderHistorii();
+            });
+            gora.appendChild(usun);
+            wpis.appendChild(gora);
+            wpis.appendChild(el('div', 'big', fmt(w.na8h, 0) + ' szt./8h'));
+            wpis.appendChild(el('div', 'big', fmt(w.operatorzy, 2) + ' oper.'));
+            wpis.appendChild(el('div', 'muted', fmt(w.naGodzine, 0) + ' szt./h'));
+            wpis.appendChild(el('div', 'muted', 'wpisano: ' + fmt(w.wartosc, 0)));
+            if (w.mala) wpis.appendChild(el('div', 'muted', 'mało wiarygodne'));
+            kol.appendChild(wpis);
+          });
+
+        siatka.appendChild(kol);
+      });
+
+      blok.appendChild(siatka);
+      kont.appendChild(blok);
+    });
+  }
+
+  // Potwierdzenie na stronie (okna confirm() bywają blokowane w przeglądarkach telefonów i plikach lokalnych)
+  var czyscBtn = $('czyscHistorie'), czyscTimer = null;
+  function resetCzyszczenia() {
+    czyscBtn.textContent = 'Wyczyść historię';
+    czyscBtn.dataset.potwierdz = '';
+    clearTimeout(czyscTimer);
+  }
+  czyscBtn.addEventListener('click', function () {
+    if (czyscBtn.dataset.potwierdz === '1') {
+      resetCzyszczenia();
+      zapiszWszystko([]);
+      renderHistorii();
+    } else {
+      czyscBtn.dataset.potwierdz = '1';
+      czyscBtn.textContent = 'Na pewno usunąć wszystko? Kliknij jeszcze raz';
+      czyscTimer = setTimeout(resetCzyszczenia, 5000);
+    }
+  });
+
+  /* ---------- Zakładki ---------- */
+  function pokaz(hist) {
+    $('panelKalk').hidden = hist;
+    $('panelHist').hidden = !hist;
+    $('tabKalk').setAttribute('aria-selected', hist ? 'false' : 'true');
+    $('tabHist').setAttribute('aria-selected', hist ? 'true' : 'false');
+    if (hist) renderHistorii(); else przelicz();
+  }
+  $('tabKalk').addEventListener('click', function () { pokaz(false); });
+  $('tabHist').addEventListener('click', function () { pokaz(true); });
+
+  /* ---------- Start ---------- */
+  elWartosc.addEventListener('input', function () { elZapisMsg.textContent = ''; przelicz(); });
+  elCzas.addEventListener('input', function () { ustawTryb(false); elZapisMsg.textContent = ''; przelicz(); });
+  elTeraz.addEventListener('click', function () { ustawTryb(true); przelicz(); });
+
+  setInterval(function () { if (trybAuto && !$('panelKalk').hidden) przelicz(); }, 15000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && trybAuto && !$('panelKalk').hidden) przelicz(); });
+
+  ustawTryb(true);
+  przelicz();
+  renderHistorii();
+})();
+</script>
+</body>
+</html>

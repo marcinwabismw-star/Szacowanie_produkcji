@@ -216,6 +216,11 @@
       <div class="value"><span id="operatorzy">–</span></div>
     </section>
 
+    <section class="card result">
+      <div class="name">Pozostała ilość opon do sprawdzenia</div>
+      <div class="value"><span id="reszta">–</span> <span class="unit">szt.</span></div>
+    </section>
+
     <button class="save" id="zapisz" type="button" disabled>Zapisz do historii</button>
     <div class="save-msg" id="zapisMsg" aria-live="polite"></div>
   </div>
@@ -239,7 +244,7 @@
   var elWartosc = $('wartosc'), elCzas = $('czas'), elTeraz = $('teraz'),
       elPodpowiedz = $('podpowiedz'), elZmiana = $('zmiana'), elOstrz = $('ostrzezenie'),
       elBlad = $('blad'), elNaGodzine = $('naGodzine'), elNa8h = $('na8h'),
-      elOperatorzy = $('operatorzy'), elZapisz = $('zapisz'), elZapisMsg = $('zapisMsg');
+      elOperatorzy = $('operatorzy'), elReszta = $('reszta'), elZapisz = $('zapisz'), elZapisMsg = $('zapisMsg');
 
   var NAZWY = { 1: 'I zmiana (6–14)', 2: 'II zmiana (14–22)', 3: 'III zmiana (22–6)' };
   var GODZINY = { 1: '6–14', 2: '14–22', 3: '22–6' };
@@ -252,6 +257,11 @@
   }
   function teraz() { var d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
   function hhmm(t) { return pad(Math.floor(t / 60)) + ':' + pad(t % 60); }
+  // Pełni operatorzy SKJ i opony, które zostają ponad nimi (615 opon na operatora na 8 godzin)
+  function podzialSkj(na8h) {
+    var pelni = Math.floor(na8h / DZIELNIK_SKJ);
+    return { pelni: pelni, reszta: na8h - pelni * DZIELNIK_SKJ };
+  }
   function klucz(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
 
   // t = minuty od północy (0–1439). Zwraca zmianę i ile minut minęło od jej startu.
@@ -290,6 +300,7 @@
 
   function wyczysc() {
     elNaGodzine.textContent = elNa8h.textContent = elOperatorzy.textContent = '–';
+    elReszta.textContent = '–';
     ostatni = null;
     elZapisz.disabled = true;
   }
@@ -332,10 +343,12 @@
     var naGodzine = wartosc / godz;
     var na8h = naGodzine * 8;
     var operatorzy = Math.round((na8h / DZIELNIK_SKJ) * 100) / 100;
+    var skj = podzialSkj(Math.round(na8h));
 
     elNaGodzine.textContent = fmt(Math.round(naGodzine), 0);
     elNa8h.textContent = fmt(Math.round(na8h), 0);
     elOperatorzy.textContent = fmt(operatorzy, 2);
+    elReszta.textContent = fmt(skj.reszta, 0);
 
     ostatni = {
       t: t, nr: z.nr, minut: z.minut, wartosc: wartosc,
@@ -394,7 +407,7 @@
     if (udalo) {
       elWartosc.value = '';
       przelicz();
-      elWartosc.focus();
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     }
     renderHistorii();
   });
@@ -426,7 +439,7 @@
 
     var doby = {};
     lista.forEach(function (w) { (doby[w.doba] = doby[w.doba] || []).push(w); });
-    Object.keys(doby).sort().forEach(function (k) {
+    Object.keys(doby).sort().reverse().forEach(function (k) {
       var blok = el('section', 'day');
       blok.appendChild(el('h2', '', nazwaDoby(k)));
       var siatka = el('div', 'cols');

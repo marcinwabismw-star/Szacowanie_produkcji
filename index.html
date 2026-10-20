@@ -169,6 +169,18 @@
   .empty { color: var(--muted); text-align: center; padding: 24px 8px; }
   .clear { width: 100%; padding: 12px; background: transparent; color: var(--err); border-color: var(--err); margin-top: 6px; }
 
+  /* Tendencja: strzałka i procent */
+  .chart-caption { font-size: .8rem; color: var(--muted); margin: 10px 0 6px; }
+  .trend-cell {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 4px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  }
+  .arrow { width: 56px; height: auto; fill: none; stroke: currentColor; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+  .arrow.up, .trend-pct.up { color: var(--ok); }
+  .arrow.down, .trend-pct.down { color: var(--err); }
+  .arrow.flat, .trend-pct.flat, .trend-pct.none { color: var(--muted); }
+  .trend-pct { font-weight: 700; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+  .trend-pct.none { font-size: .8rem; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -426,6 +438,63 @@
     return d.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric' });
   }
 
+  /* ---------- Wykres tendencji ---------- */
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  function svgEl(nazwa, atrybuty) {
+    var e = document.createElementNS(SVGNS, nazwa);
+    for (var k in atrybuty) e.setAttribute(k, atrybuty[k]);
+    return e;
+  }
+
+  // Prosta regresja liniowa y = a*x + b; zwraca null, gdy punktów jest za mało
+  function regresja(punkty) {
+    var n = punkty.length;
+    if (n < 2) return null;
+    var sx = 0, sy = 0, sxx = 0, sxy = 0;
+    punkty.forEach(function (p) { sx += p.x; sy += p.y; sxx += p.x * p.x; sxy += p.x * p.y; });
+    var d = n * sxx - sx * sx;
+    if (d === 0) return null;
+    var a = (n * sxy - sx * sy) / d;
+    return { a: a, b: (sy - a * sx) / n };
+  }
+
+  function strzalka(kat, klasa) {
+    var svg = svgEl('svg', { viewBox: '0 0 48 32', 'class': 'arrow ' + klasa, 'aria-hidden': 'true' });
+    var g = svgEl('g', { transform: 'rotate(' + kat + ' 24 16)' });
+    g.appendChild(svgEl('line', { x1: 6, y1: 16, x2: 38, y2: 16 }));
+    g.appendChild(svgEl('polyline', { points: '29,7 40,16 29,25' }));
+    svg.appendChild(g);
+    return svg;
+  }
+
+  // Prosta tendencja zmiany: strzałka i procent. Liczona tylko z wiarygodnych odczytów (od 30 min zmiany).
+  function wykresZmiany(wpisy) {
+    var kom = el('div', 'trend-cell');
+    var wiarygodne = wpisy.filter(function (w) { return !w.mala; })
+      .sort(function (a, b) { return a.minut - b.minut; })
+      .map(function (w) { return { x: w.minut, y: w.na8h }; });
+    var reg = regresja(wiarygodne);
+    var rozpietosc = wiarygodne.length ? wiarygodne[wiarygodne.length - 1].x - wiarygodne[0].x : 0;
+
+    if (!reg || rozpietosc < 60) {
+      kom.appendChild(el('div', 'trend-pct none', wpisy.length ? 'za mało danych' : '–'));
+      return kom;
+    }
+
+    var x1 = wiarygodne[0].x, x2 = wiarygodne[wiarygodne.length - 1].x;
+    var y1 = reg.a * x1 + reg.b, y2 = reg.a * x2 + reg.b;
+    var zmiana = y1 > 0 ? ((y2 - y1) / y1) * 100 : 0;
+
+    var klasa, kat, tekst;
+    if (Math.abs(zmiana) < 1) { klasa = 'flat'; kat = 0; tekst = 'bez zmian'; }
+    else if (zmiana > 0) { klasa = 'up'; kat = -35; tekst = '+' + fmt(zmiana, 1) + '%'; }
+    else { klasa = 'down'; kat = 35; tekst = fmt(zmiana, 1) + '%'; }
+
+    kom.appendChild(strzalka(kat, klasa));
+    kom.appendChild(el('div', 'trend-pct ' + klasa, tekst));
+    return kom;
+  }
+
   function renderHistorii() {
     var lista = wczytaj();
     var kont = $('historiaLista');
@@ -480,6 +549,13 @@
       });
 
       blok.appendChild(siatka);
+
+      blok.appendChild(el('div', 'chart-caption', 'Tendencja produkcji (szacunek na 8 godzin)'));
+      var wykresy = el('div', 'cols');
+      [1, 2, 3].forEach(function (nr) {
+        wykresy.appendChild(wykresZmiany(doby[k].filter(function (w) { return w.zmiana === nr; })));
+      });
+      blok.appendChild(wykresy);
       kont.appendChild(blok);
     });
   }
